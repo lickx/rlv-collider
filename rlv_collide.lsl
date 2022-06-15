@@ -55,6 +55,7 @@ CovertSay(string sText)
 
 Init()
 {
+    g_kVictim = NULL_KEY;
     flip = FALSE;
     llSetStatus(STATUS_PHANTOM, FALSE); // workaround
     llSleep(0.4);
@@ -104,8 +105,8 @@ default
         if (llList2String(lResponse, 0) != TRAPNAME) return;
         string sCmd = llList2String(lResponse, 2);
         if (llListFindList(g_lCommands, [sCmd]) != g_iCurrentCmd) {
-            llOwnerSay("ERROR command response is not what was expected");
-            g_kVictim = NULL_KEY;
+            llOwnerSay("ERROR: RLV command response is not what was expected");
+            Init();
             return;
         }
         if (g_iCurrentCmd == 0) {
@@ -124,7 +125,6 @@ default
         if (g_iCurrentCmd == (llGetListLength(g_lCommands)-1)) {
             // Clean up after last command, suspend before re-arming
             CovertSay("Naughty bush! Time for the weedkiller!");
-            g_kVictim = NULL_KEY;
             Init();
         }
     }
@@ -133,7 +133,6 @@ default
     {
         // This timer will be executed if no relay was found
         llSetTimerEvent(0.0);
-        g_kVictim = NULL_KEY;
         Init();
     }
     
