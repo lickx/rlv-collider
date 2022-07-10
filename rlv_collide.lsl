@@ -7,6 +7,7 @@
 // Doesn't use ossl functions so should work in SL too
 // ===========================================================================
 
+float   WAIT_RESET_TIME = 10.0; // seconds before trap is armed again
 float   RELAY_DETECT_TIME = 5.0;
 
 integer flip = FALSE;   // workaround
@@ -53,23 +54,15 @@ CovertSay(string sText)
     llSetObjectName(sObjectName);
 }
 
-Init()
-{
-    g_kVictim = NULL_KEY;
-    flip = FALSE;
-    llSetStatus(STATUS_PHANTOM, FALSE); // workaround
-    llSleep(0.4);
-    llVolumeDetect(TRUE);
-    llListenRemove(g_iHandle);
-    g_iHandle = llListen(RLV_RC, "", "", "");
-}
-
 default
 {
     state_entry()
     {
         if (llGetListLength(g_lCommands)<=1) Configure();
-        Init();
+        flip = FALSE;
+        llSetStatus(STATUS_PHANTOM, FALSE); // workaround
+        llSleep(0.4);
+        llVolumeDetect(TRUE);
     }
     
     on_rez(integer start_param)
@@ -91,6 +84,7 @@ default
             flip = TRUE;
             g_kVictim = llDetectedKey(0);
             if (g_kVictim==NULL_KEY) return;
+            g_iHandle = llListen(RLV_RC, "", "", "");
             llSetTimerEvent(RELAY_DETECT_TIME);
             g_iCurrentCmd = 0; // !version
             llRegionSayTo((string)g_kVictim, RLV_RC,
@@ -105,8 +99,9 @@ default
         if (llList2String(lResponse, 0) != TRAPNAME) return;
         string sCmd = llList2String(lResponse, 2);
         if (llListFindList(g_lCommands, [sCmd]) != g_iCurrentCmd) {
-            llOwnerSay("ERROR: RLV command response is not what was expected");
-            Init();
+            llOwnerSay("ERROR command response is not what was expected");
+            g_kVictim = NULL_KEY;
+            llListenRemove(g_iHandle);
             return;
         }
         if (g_iCurrentCmd == 0) {
@@ -125,7 +120,9 @@ default
         if (g_iCurrentCmd == (llGetListLength(g_lCommands)-1)) {
             // Clean up after last command, suspend before re-arming
             CovertSay("Naughty bush! Time for the weedkiller!");
-            Init();
+            g_kVictim = NULL_KEY;
+            llListenRemove(g_iHandle);
+            state suspend;
         }
     }
     
@@ -133,7 +130,8 @@ default
     {
         // This timer will be executed if no relay was found
         llSetTimerEvent(0.0);
-        Init();
+        g_kVictim = NULL_KEY;
+        llListenRemove(g_iHandle);
     }
     
     dataserver(key kID, string sData)
@@ -149,5 +147,18 @@ default
             if (llGetSubString(sLine, 0, 0)!="#") g_lCommands += sData;
             g_kdsNotecard = llGetNotecardLine(NOTECARD, ++g_iNotecardLine);
         }
+    }
+}
+
+state suspend
+{
+    state_entry()
+    {
+        llSetTimerEvent(WAIT_RESET_TIME);
+    }
+    
+    timer()
+    {
+        state default;
     }
 }
